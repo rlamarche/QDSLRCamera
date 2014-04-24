@@ -1,0 +1,4 @@
+{
+    "Keys": ["mediagphoto"],
+    "Services": ["org.qt-project.qt.camera"]
+}
