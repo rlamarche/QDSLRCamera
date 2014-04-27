@@ -3,13 +3,13 @@
 
 #include <QObject>
 #include <QCameraImageCaptureControl>
-
+#include "qgphotocapturesession.h"
 
 class QGPhotoImageCaptureControl : public QCameraImageCaptureControl
 {
     Q_OBJECT
 public:
-    explicit QGPhotoImageCaptureControl(QObject *parent = 0);
+    explicit QGPhotoImageCaptureControl(QGPhotoCaptureSession *captureSession);
 
     bool isReadyForCapture() const;
 
@@ -19,6 +19,10 @@ public:
     int capture(const QString &fileName);
     void cancelCapture();
 
+private:
+    QGPhotoCaptureSession *m_captureSession;
+
+    int m_lastId;
 signals:
 
 public slots:

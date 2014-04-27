@@ -7,6 +7,7 @@
 
 #include "qgphotoimagecapturecontrol.h"
 #include "qgphotocameracontrol.h"
+#include "qgphotovideoinputdevicecontrol.h"
 
 class QGPhotoCaptureService : public QMediaService
 {
@@ -20,8 +21,10 @@ public:
     void releaseControl(QMediaControl *);
 
 private:
+    QGPhotoCaptureSession *m_captureSession;
     QGPhotoImageCaptureControl *m_imageCaptureControl;
     QGPhotoCameraControl *m_cameraControl;
+    QGPhotoVideoInputDeviceControl *m_videoInputDevice;
 
 signals:
 

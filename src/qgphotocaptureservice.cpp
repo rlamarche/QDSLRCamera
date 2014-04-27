@@ -3,16 +3,29 @@
 #include <iostream>
 
 #include <QCameraControl>
+#include <QMediaServiceProviderPlugin>
 
 QGPhotoCaptureService::QGPhotoCaptureService(const QString &service, QObject *parent) :
     QMediaService(parent)
 {
 
+    m_captureSession = 0;
+    m_cameraControl = 0;
+    m_imageCaptureControl = 0;
+    m_videoInputDevice = 0;
+
+    if (service == Q_MEDIASERVICE_CAMERA) {
+        m_captureSession = new QGPhotoCaptureSession(this);
+        m_cameraControl = new QGPhotoCameraControl(m_captureSession);
+        m_imageCaptureControl = new QGPhotoImageCaptureControl(m_captureSession);
+        m_videoInputDevice = new QGPhotoVideoInputDeviceControl(m_captureSession);
+    }
+
 }
 
 QGPhotoCaptureService::~QGPhotoCaptureService()
 {
-
+    delete m_captureSession;
 }
 
 QMediaControl *QGPhotoCaptureService::requestControl(const char *name)
@@ -25,6 +38,10 @@ QMediaControl *QGPhotoCaptureService::requestControl(const char *name)
 
     if (qstrcmp(name, QCameraImageCaptureControl_iid) == 0)
         return m_imageCaptureControl;
+
+    if (qstrcmp(name, QVideoDeviceSelectorControl_iid) == 0)
+        return m_videoInputDevice;
+
 
     return 0;
 }

@@ -3,18 +3,12 @@
 #include <gphoto2/gphoto2-context.h>
 #include <gphoto2/gphoto2-camera.h>
 
-#include <QtCore/qdebug.h>
 #include <QtCore/QDebug>
-
-#include <iostream>
 
 #include "qgphotocaptureservice.h"
 
 QMediaService* QGPhotoCaptureServicePlugin::create(const QString &key)
 {
-    std::cout << "Hello World\n";
-    std::cout.flush();
-
     if (key == QLatin1String(Q_MEDIASERVICE_CAMERA))
         return new QGPhotoCaptureService(key);
 
@@ -32,8 +26,6 @@ void QGPhotoCaptureServicePlugin::release(QMediaService *service)
 
 QList<QByteArray> QGPhotoCaptureServicePlugin::devices(const QByteArray &service) const
 {
-    std::cout << "Devices\n";
-    std::cout.flush();
     if (service == Q_MEDIASERVICE_CAMERA) {
         if (m_cameraDevices.isEmpty())
             updateDevices();

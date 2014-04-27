@@ -1,7 +1,9 @@
 #include "qgphotovideoinputdevicecontrol.h"
 
-QGPhotoVideoInputDeviceControl::QGPhotoVideoInputDeviceControl(QGPhotoCaptureSession *captureSession, QObject *parent) :
-    QVideoDeviceSelectorControl(parent),
+#include <QtCore/QDebug>
+
+QGPhotoVideoInputDeviceControl::QGPhotoVideoInputDeviceControl(QGPhotoCaptureSession *captureSession) :
+    QVideoDeviceSelectorControl(captureSession),
     m_captureSession(captureSession)
 {
 }
@@ -11,37 +13,38 @@ QGPhotoVideoInputDeviceControl::~QGPhotoVideoInputDeviceControl() {
 }
 
 int QGPhotoVideoInputDeviceControl::deviceCount() const {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::deviceCount";
 
-    return 0;
+    return m_captureSession->deviceCount();
 }
 
 QString QGPhotoVideoInputDeviceControl::deviceName(int index) const {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::deviceName";
 
-    return QString("FakeDevice");
+    return m_captureSession->deviceName(index);
 }
 
 QString QGPhotoVideoInputDeviceControl::deviceDescription(int index) const {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::deviceDescription";
 
-    return QString("Fake description");
+    return m_captureSession->deviceDescription(index);
 }
 
 int QGPhotoVideoInputDeviceControl::defaultDevice() const {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::defaultDevice";
 
-    return 0;
+    return m_captureSession->defaultDevice();
 }
 
 int QGPhotoVideoInputDeviceControl::selectedDevice() const {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::selectedDevice";
 
-    return 0;
+    return m_captureSession->selectedDevice();
 }
 
 void QGPhotoVideoInputDeviceControl::setSelectedDevice(int index)
 {
-    // TODO
+    qDebug() << "QGPhotoVideoInputDeviceControl::setSelectedDevice " << index;
+    m_captureSession->setSelectedDevice(index);
 }
 

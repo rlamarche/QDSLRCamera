@@ -10,7 +10,7 @@ class QGPhotoVideoInputDeviceControl : public QVideoDeviceSelectorControl
 {
     Q_OBJECT
 public:
-    explicit QGPhotoVideoInputDeviceControl(QGPhotoCaptureSession *captureSession, QObject *parent = 0);
+    explicit QGPhotoVideoInputDeviceControl(QGPhotoCaptureSession *captureSession);
 
     ~QGPhotoVideoInputDeviceControl();
 

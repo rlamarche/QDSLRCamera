@@ -2,7 +2,7 @@
 
 
 #include <QCamera>
-
+#include <QCameraImageCapture>
 
 #include <iostream>
 
@@ -26,11 +26,41 @@ int main(int argc, char *argv[])
         cout << QString(current).toStdString() << "\n";
     }
 
-    //QCamera *camera = new QCamera(devices[1]);
-
+    cout << "### New camera\n";
     cout.flush();
 
-    //delete camera;
+    QCamera *camera = new QCamera(devices[1]);
+
+    cout << "### Camera device description\n";
+    cout.flush();
+    QString description = camera->deviceDescription(devices.at(1)); //
+    std::cout << description.toStdString() << "\n";
+
+
+    QCameraImageCapture *imageCapture = new QCameraImageCapture(camera); // Object to take pictures
+    camera->setCaptureMode(QCamera::CaptureStillImage); // Set the camera mode
+
+    cout << "### Start camera\n";
+    cout.flush();
+
+
+    camera->start();
+/*
+    camera->searchAndLock();
+    imageCapture->capture(QString('/tmp/test.jpg')); // Method to take a picture. Arg: path to save the picture
+
+    camera->unlock();
+*/
+
+    imageCapture->capture(QString("/tmp/capture.nef"));
+
+    cout << "### Stop camera\n";
+    cout.flush();
+    camera->stop();
+
+
+    delete imageCapture;
+    delete camera;
 
     return a.exec();
 }

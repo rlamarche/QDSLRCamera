@@ -1,33 +1,47 @@
 #include "qgphotoimagecapturecontrol.h"
 
-QGPhotoImageCaptureControl::QGPhotoImageCaptureControl(QObject *parent) :
-    QCameraImageCaptureControl(parent)
+#include <QtCore/QDebug>
+
+QGPhotoImageCaptureControl::QGPhotoImageCaptureControl(QGPhotoCaptureSession *captureSession) :
+    QCameraImageCaptureControl(captureSession) ,
+    m_captureSession(captureSession),
+    m_lastId(0)
 {
 }
 
 
 bool QGPhotoImageCaptureControl::isReadyForCapture() const {
-    // TODO
-
-    return true;
+    QGPhotoCaptureSession::State state = m_captureSession->state();
+    if (state == QGPhotoCaptureSession::ReadyState) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 QCameraImageCapture::DriveMode QGPhotoImageCaptureControl::driveMode() const {
-    // TODO
+    // TODO define more drive mode
 
     return QCameraImageCapture::SingleImageCapture;
 }
 
 void QGPhotoImageCaptureControl::setDriveMode(QCameraImageCapture::DriveMode mode) {
-    // TODO
+    // TODO implement drive mode on session
+
+    qDebug() << "QGPhotoImageCaptureControl::setDriveMode";
 }
 
 int QGPhotoImageCaptureControl::capture(const QString &fileName) {
-    // TODO
+    qDebug() << "QGPhotoImageCaptureControl::capture " << filename;
 
-    return 0;
+    m_lastId ++;
+    m_captureSession->captureImage(m_lastId, fileName);
+
+    return m_lastId;
 }
 
 void QGPhotoImageCaptureControl::cancelCapture() {
     // TODO
+
+    qDebug() << "QGPhotoImageCaptureControl::cancelCapture";
 }
