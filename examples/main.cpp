@@ -26,11 +26,11 @@ int main(int argc, char *argv[])
         cout << QString(current).toStdString() << "\n";
     }
 
-    QCamera *camera = new QCamera(devices[1]);
+    //QCamera *camera = new QCamera(devices[1]);
 
     cout.flush();
 
-    delete camera;
+    //delete camera;
 
     return a.exec();
 }

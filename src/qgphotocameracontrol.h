@@ -10,6 +10,18 @@ class QGPhotoCameraControl : public QCameraControl
 public:
     explicit QGPhotoCameraControl(QObject *parent = 0);
 
+    QCamera::State state() const;
+    void setState(QCamera::State state);
+
+    QCamera::Status status() const;
+
+    QCamera::CaptureModes captureMode() const;
+    void setCaptureMode(QCamera::CaptureModes);
+    bool isCaptureModeSupported(QCamera::CaptureModes mode) const;
+
+    bool canChangeProperty(PropertyChangeType changeType, QCamera::Status status) const;
+
+
 signals:
 
 public slots:

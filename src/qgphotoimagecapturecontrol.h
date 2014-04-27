@@ -11,6 +11,14 @@ class QGPhotoImageCaptureControl : public QCameraImageCaptureControl
 public:
     explicit QGPhotoImageCaptureControl(QObject *parent = 0);
 
+    bool isReadyForCapture() const;
+
+    QCameraImageCapture::DriveMode driveMode() const;
+    void setDriveMode(QCameraImageCapture::DriveMode mode);
+
+    int capture(const QString &fileName);
+    void cancelCapture();
+
 signals:
 
 public slots:
