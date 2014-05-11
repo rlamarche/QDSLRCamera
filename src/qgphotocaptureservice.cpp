@@ -20,6 +20,7 @@ QGPhotoCaptureService::QGPhotoCaptureService(const QString &service, QObject *pa
         m_imageCaptureControl = new QGPhotoImageCaptureControl(m_captureSession);
         m_videoInputDevice = new QGPhotoVideoInputDeviceControl(m_captureSession);
         m_videoRenderer = new QGPhotoVideoRendererControl(m_captureSession);
+        m_exposureControl = new QGPhotoCameraExposureControl(m_captureSession);
     }
 
 }
@@ -45,6 +46,9 @@ QMediaControl *QGPhotoCaptureService::requestControl(const char *name)
 
     if (qstrcmp(name, QVideoRendererControl_iid) == 0)
         return m_videoRenderer;
+
+    if (qstrcmp(name, QCameraExposureControl_iid) == 0)
+        return m_exposureControl;
 
 
 

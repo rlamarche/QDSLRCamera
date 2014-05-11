@@ -52,7 +52,21 @@ int main(int argc, char *argv[])
     camera->unlock();
 */
 
-    imageCapture->capture(QString("/tmp/capture.nef"));
+  //  imageCapture->capture(QString("/tmp/capture.nef"));
+
+
+    qDebug() << camera->exposure()->supportedApertures();
+    qDebug() << camera->exposure()->supportedIsoSensitivities();
+    qDebug() << camera->exposure()->supportedShutterSpeeds();
+
+    qDebug() << "Aperture = " << camera->exposure()->aperture();
+    qDebug() << "Shutter speed = " << camera->exposure()->shutterSpeed();
+    qDebug() << "ISO = " << camera->exposure()->isoSensitivity();
+
+    camera->exposure()->setManualAperture(5.6);
+    camera->exposure()->setManualShutterSpeed(10.0);
+    camera->exposure()->setManualIsoSensitivity(800);
+
 
     cout << "### Stop camera\n";
     cout.flush();

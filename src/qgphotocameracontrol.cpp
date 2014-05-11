@@ -6,9 +6,9 @@
 QGPhotoCameraControl::QGPhotoCameraControl(QGPhotoCaptureSession *captureSession) :
     QCameraControl(captureSession),
     m_captureSession(captureSession),
+    m_captureMode(QCamera::CaptureStillImage),
     m_state(QCamera::UnloadedState),
-    m_status(QCamera::UnloadedStatus),
-    m_captureMode(QCamera::CaptureStillImage)
+    m_status(QCamera::UnloadedStatus)
 {
     connect(m_captureSession, SIGNAL(stateChanged(QGPhotoCaptureSession::State)),
             this, SLOT(updateStatus()));

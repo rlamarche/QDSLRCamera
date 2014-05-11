@@ -5,8 +5,10 @@
 #include <QList>
 #include <QStringList>
 #include <QImage>
+#include <QRegExp>
 
 #include <QAbstractVideoSurface>
+#include <QCameraExposureControl>
 
 #include <gphoto2/gphoto2-context.h>
 #include <gphoto2/gphoto2-camera.h>
@@ -43,6 +45,10 @@ public:
     void captureImage(int reqId, const QString &fileName);
     QImage capturePreview();
 
+    QVariant actualExposureValue(QCameraExposureControl::ExposureParameter parameter);
+    bool setExposureValue(QCameraExposureControl::ExposureParameter parameter, const QVariant& value);
+    QVariantList supportedExposureParameterRange(QCameraExposureControl::ExposureParameter parameter, bool *continuous);
+
     QGPhotoCaptureSession::State state();
 
     void setSurface(QAbstractVideoSurface *surface);
@@ -51,7 +57,12 @@ private:
 
     void gpError(int gpStatus, QString message);
 
-    void setWidgetValue(QString name, const void *value);
+    void setWidgetValue(QString name, QVariant value);
+    QVariantList getWidgetRange(QString name);
+    void getWidgetValue(QString name, void *value);
+
+    QString exposureParameterToWidgetName(QCameraExposureControl::ExposureParameter parameter) const;
+    QVariant exposureLabelToValue(QCameraExposureControl::ExposureParameter parameter, QVariant value) const;
 
     GPContext *m_gpContext;
     Camera *m_gpCamera;

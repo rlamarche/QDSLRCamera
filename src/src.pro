@@ -21,7 +21,8 @@ SOURCES += \
     qgphotovideoinputdevicecontrol.cpp \
     qgphotocapturesession.cpp \
     qgphotovideorenderercontrol.cpp \
-    qgphotoviewfinderthread.cpp
+    qgphotoviewfinderthread.cpp \
+    qgphotocameraexposurecontrol.cpp
 
 HEADERS += \
     qgphotocaptureserviceplugin.h \
@@ -31,7 +32,8 @@ HEADERS += \
     qgphotovideoinputdevicecontrol.h \
     qgphotocapturesession.h \
     qgphotovideorenderercontrol.h \
-    qgphotoviewfinderthread.h
+    qgphotoviewfinderthread.h \
+    qgphotocameraexposurecontrol.h
 OTHER_FILES += QDSLRCamera.json
 
 unix {

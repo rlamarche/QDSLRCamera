@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QVideoSurfaceFormat>
 #include <QDir>
+#include <QRegExp>
 
 #include "qgphotoviewfinderthread.h"
 
@@ -59,7 +60,8 @@ void QGPhotoCaptureSession::updateDevices() const
     gp_list_free(list);
 }
 
-void QGPhotoCaptureSession::openDevice() {
+void QGPhotoCaptureSession::openDevice()
+{
     if (!m_gpCamera || m_deviceChanged) {
         if (m_gpCamera) {
             closeDevice();
@@ -177,7 +179,8 @@ void QGPhotoCaptureSession::openDevice() {
     m_deviceChanged = false;
 }
 
-void QGPhotoCaptureSession::closeDevice() {
+void QGPhotoCaptureSession::closeDevice()
+{
     qDebug("QGPhotoCaptureSession::closeDevice");
     stopViewFinder();
 
@@ -193,7 +196,8 @@ void QGPhotoCaptureSession::closeDevice() {
     m_state = StoppedState;
 }
 
-void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
+void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName)
+{
     CameraFile *gpFile;
     CameraFilePath gpCameraFilePath;
     int gpStatus;
@@ -292,27 +296,33 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
 
 }
 
-int QGPhotoCaptureSession::deviceCount() const {
+int QGPhotoCaptureSession::deviceCount() const
+{
     return m_cameraDevices.length();
 }
 
-QString QGPhotoCaptureSession::deviceName(int index) const {
+QString QGPhotoCaptureSession::deviceName(int index) const
+{
     return m_cameraDevices[index];
 }
 
-QString QGPhotoCaptureSession::deviceDescription(int index) const {
+QString QGPhotoCaptureSession::deviceDescription(int index) const
+{
     return m_cameraDescriptions[index];
 }
 
-int QGPhotoCaptureSession::defaultDevice() const {
+int QGPhotoCaptureSession::defaultDevice() const
+{
     return 0;
 }
 
-int QGPhotoCaptureSession::selectedDevice() const {
+int QGPhotoCaptureSession::selectedDevice() const
+{
     return m_selectedDevice;
 }
 
-void QGPhotoCaptureSession::setSelectedDevice(int index) {
+void QGPhotoCaptureSession::setSelectedDevice(int index)
+{
     if (m_state == ReadyState && index != m_selectedDevice) {
         qDebug("Selected device has changed !");
         m_deviceChanged = true;
@@ -320,7 +330,8 @@ void QGPhotoCaptureSession::setSelectedDevice(int index) {
     m_selectedDevice = index;
 }
 
-void QGPhotoCaptureSession::gpError(int gpStatus, QString message) {
+void QGPhotoCaptureSession::gpError(int gpStatus, QString message)
+{
     QString errorMsg;
 
     switch (gpStatus) {
@@ -438,11 +449,13 @@ void QGPhotoCaptureSession::gpError(int gpStatus, QString message) {
     emit error(gpStatus, errorMsg);
 }
 
-QGPhotoCaptureSession::State QGPhotoCaptureSession::state() {
+QGPhotoCaptureSession::State QGPhotoCaptureSession::state()
+{
     return m_state;
 }
 
-void QGPhotoCaptureSession::setSurface(QAbstractVideoSurface *surface) {
+void QGPhotoCaptureSession::setSurface(QAbstractVideoSurface *surface)
+{
     qDebug("QGPhotoCaptureSession::setSurface");
     if (m_videoSurface && m_videoSurface != surface) {
         disconnect(m_videoSurface, SIGNAL(activeChanged(bool)), this, SLOT(videoSurfaceActive(bool)));
@@ -452,7 +465,8 @@ void QGPhotoCaptureSession::setSurface(QAbstractVideoSurface *surface) {
     connect(m_videoSurface, SIGNAL(activeChanged(bool)), this, SLOT(videoSurfaceActive(bool)));
 }
 
-QImage QGPhotoCaptureSession::capturePreview() {
+QImage QGPhotoCaptureSession::capturePreview()
+{
     int gpStatus;
     CameraFile *gpFile;
     unsigned long int size;
@@ -488,24 +502,27 @@ QImage QGPhotoCaptureSession::capturePreview() {
     return image;
 }
 
-void QGPhotoCaptureSession::videoSurfaceActive(bool active) {
+void QGPhotoCaptureSession::videoSurfaceActive(bool active)
+{
     if (active && m_videoSurface) {
         qDebug("Surface active");
         m_viewFinderThread->start();
     }
 }
 
-void QGPhotoCaptureSession::previewAvailable(const QImage &preview) {
+void QGPhotoCaptureSession::previewAvailable(const QImage &preview)
+{
     if (m_videoSurface->isActive()) {
         QVideoFrame frame(preview);
         m_videoSurface->present(frame);
     }
 }
 
-void QGPhotoCaptureSession::startViewFinder() {
+void QGPhotoCaptureSession::startViewFinder()
+{
     if (m_videoSurface) {
         int value = 1;
-        setWidgetValue(QString("viewfinder"), &value);
+        setWidgetValue(QString("viewfinder"), QVariant(value));
         QImage preview = capturePreview();
         QVideoFrame frame(preview);
 
@@ -515,23 +532,26 @@ void QGPhotoCaptureSession::startViewFinder() {
     }
 }
 
-void QGPhotoCaptureSession::pauseViewFinder() {
+void QGPhotoCaptureSession::pauseViewFinder()
+{
     m_viewFinderThread->stopNow();
     if (m_gpContext && m_gpCamera && m_gpWindow) {
         int value = 0;
-        setWidgetValue(QString("viewfinder"), &value);
+        setWidgetValue(QString("viewfinder"), QVariant(value));
     }
     m_viewFinderRunning = false;
 }
 
-void QGPhotoCaptureSession::continueViewFinder() {
+void QGPhotoCaptureSession::continueViewFinder()
+{
     int value = 1;
-    setWidgetValue(QString("viewfinder"), &value);
+    setWidgetValue(QString("viewfinder"), QVariant(value));
     m_viewFinderThread->start();
     m_viewFinderRunning = true;
 }
 
-void QGPhotoCaptureSession::stopViewFinder() {
+void QGPhotoCaptureSession::stopViewFinder()
+{
     if (m_videoSurface) {
         m_videoSurface->stop();
     }
@@ -539,14 +559,18 @@ void QGPhotoCaptureSession::stopViewFinder() {
     m_viewFinderThread->stopNow();
     if (m_gpContext && m_gpCamera && m_gpWindow) {
         int value = 0;
-        setWidgetValue(QString("viewfinder"), &value);
+        setWidgetValue(QString("viewfinder"), QVariant(value));
     }
     m_viewFinderRunning = false;
 }
 
-void QGPhotoCaptureSession::setWidgetValue(QString name, const void *value) {
+void QGPhotoCaptureSession::setWidgetValue(QString name, QVariant value)
+{
     CameraWidget *gpWidget;
+    CameraWidgetType gpWidgetType;
     int gpStatus;
+    int intValue;
+    float floatValue;
 
     gpStatus = gp_widget_get_child_by_name(m_gpWindow, name.toStdString().c_str(), &gpWidget);
     if (gpStatus != GP_OK) {
@@ -554,7 +578,32 @@ void QGPhotoCaptureSession::setWidgetValue(QString name, const void *value) {
         return;
     }
 
-    gpStatus = gp_widget_set_value(gpWidget, value);
+    gpStatus = gp_widget_get_type(gpWidget, &gpWidgetType);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get widget type"));
+        return;
+    }
+
+    switch (gpWidgetType) {
+        case GP_WIDGET_RADIO:
+        case GP_WIDGET_MENU:
+        case GP_WIDGET_TEXT:
+            gp_widget_set_value(gpWidget, value.toString().toStdString().c_str());
+            break;
+
+        case GP_WIDGET_TOGGLE:
+        case GP_WIDGET_DATE:
+            intValue = value.toInt();
+            gpStatus = gp_widget_set_value(gpWidget, &intValue);
+            break;
+        case GP_WIDGET_RANGE:
+            floatValue = value.toFloat();
+            gpStatus = gp_widget_set_value(gpWidget, &floatValue);
+            break;
+
+        default: break;
+    }
+
     if (gpStatus != GP_OK) {
         gpError(gpStatus, QString("Unable to set widget value"));
         return;
@@ -564,5 +613,170 @@ void QGPhotoCaptureSession::setWidgetValue(QString name, const void *value) {
     if (gpStatus != GP_OK) {
         gpError(gpStatus, QString("Unable to set config"));
         return;
+    }
+}
+
+QVariantList QGPhotoCaptureSession::getWidgetRange(QString name)
+{
+    CameraWidget *gpWidget;
+    int gpStatus;
+    QVariantList res;
+    const char* choiceLabel;
+
+    gpStatus = gp_widget_get_child_by_name(m_gpWindow, name.toStdString().c_str(), &gpWidget);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get child widget by name"));
+        return res;
+    }
+
+    int n = gp_widget_count_choices(gpWidget);
+
+
+    for (int i = 0; i < n; i ++) {
+        gpStatus = gp_widget_get_choice(gpWidget, i, &choiceLabel);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to get widget choice"));
+            break;
+        }
+        res << QString(choiceLabel);
+    }
+
+    return res;
+}
+
+void QGPhotoCaptureSession::getWidgetValue(QString name, void *value)
+{
+    CameraWidget *gpWidget;
+    int gpStatus;
+
+    gpStatus = gp_camera_get_config(m_gpCamera, &m_gpWindow, m_gpContext);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get camera config"));
+        return;
+    }
+
+    gpStatus = gp_widget_get_child_by_name(m_gpWindow, name.toStdString().c_str(), &gpWidget);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get child widget by name"));
+    }
+
+    gpStatus = gp_widget_get_value(gpWidget, value);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get widget value"));
+    }
+}
+
+QVariant QGPhotoCaptureSession::actualExposureValue(QCameraExposureControl::ExposureParameter parameter)
+{
+    QString name = exposureParameterToWidgetName(parameter);
+
+    char* value = 0;
+
+    getWidgetValue(name, &value);
+
+    if (value) {
+        return exposureLabelToValue(parameter, QVariant(QString(value)));
+    } else {
+        return QVariant::Invalid;
+    }
+}
+
+bool QGPhotoCaptureSession::setExposureValue(QCameraExposureControl::ExposureParameter parameter, const QVariant &value)
+{
+    QVariantList supportedValues = supportedExposureParameterRange(parameter, 0);
+
+    bool ok;
+    qreal realValue = value.toReal(&ok);
+    if (!ok)
+    {
+        return false;
+    }
+
+    // Find the nearest value always rounded below
+    int i = 0;
+    qreal current;
+    for (QVariantList::Iterator iter = supportedValues.begin(); iter != supportedValues.end(); iter ++) {
+        current = (*iter).toReal();
+
+        if (realValue == current) {
+            break;
+        }
+
+        if (iter != supportedValues.end() - 1) {
+            qreal next = (*(iter + 1)).toReal();
+
+            if (realValue > current && realValue < next) {
+                break;
+            }
+            if (realValue < current && realValue > next) {
+                i ++;
+                break;
+            }
+        }
+        i ++;
+    }
+
+    QString name = exposureParameterToWidgetName(parameter);
+    QVariantList strValues = getWidgetRange(name);
+
+    setWidgetValue(name, strValues.at(i));
+
+    return true;
+}
+
+QVariantList QGPhotoCaptureSession::supportedExposureParameterRange(QCameraExposureControl::ExposureParameter parameter, bool *continuous)
+{
+    if (continuous) {
+        *continuous = false;
+    }
+
+    QString widgetName = exposureParameterToWidgetName(parameter);
+
+    QVariantList values = getWidgetRange(widgetName);
+    QVariantList qrealValues;
+    for (QVariantList::Iterator value = values.begin(); value != values.end(); value ++) {
+        qrealValues << exposureLabelToValue(parameter, *value);
+    }
+
+    return qrealValues;
+}
+
+QString QGPhotoCaptureSession::exposureParameterToWidgetName(QCameraExposureControl::ExposureParameter parameter) const
+{
+    switch (parameter) {
+    case QCameraExposureControl::ExposureCompensation:
+        return QString("exposurecompensation");
+        break;
+    case QCameraExposureControl::ISO:
+        return QString("iso");
+        break;
+    case QCameraExposureControl::Aperture:
+        return QString("5007");
+        break;
+    case QCameraExposureControl::ShutterSpeed:
+        return QString("500d");
+        break;
+    default:
+        break;
+    }
+
+    return QString("unknown");
+}
+
+QVariant QGPhotoCaptureSession::exposureLabelToValue(QCameraExposureControl::ExposureParameter parameter, QVariant value) const
+{
+    switch (parameter) {
+    case QCameraExposureControl::ISO:
+        return value;
+        break;
+    case QCameraExposureControl::Aperture:
+        return QVariant(value.toReal() / 100.0);
+        break;
+    case QCameraExposureControl::ShutterSpeed:
+        return QVariant(value.toReal() / 10000.0);
+        break;
+    default:
+        return value;
+        break;
     }
 }
