@@ -7,6 +7,12 @@ QGPhotoImageCaptureControl::QGPhotoImageCaptureControl(QGPhotoCaptureSession *ca
     m_captureSession(captureSession),
     m_lastId(0)
 {
+    connect(m_captureSession, SIGNAL(imageAvailable(int,QVideoFrame)), this, SIGNAL(imageAvailable(int,QVideoFrame)));
+    connect(m_captureSession, SIGNAL(imageCaptured(int,QImage)), this, SIGNAL(imageCaptured(int,QImage)));
+    connect(m_captureSession, SIGNAL(imageExposed(int)), this, SIGNAL(imageExposed(int)));
+    connect(m_captureSession, SIGNAL(imageMetadataAvailable(int,QString,QVariant)), this, SIGNAL(imageMetadataAvailable(int,QString,QVariant)));
+    connect(m_captureSession, SIGNAL(imageSaved(int,QString)), this, SIGNAL(imageSaved(int,QString)));
+    connect(m_captureSession, SIGNAL(captureError(int,int,QString)), this, SIGNAL(error(int,int,QString)));
 }
 
 

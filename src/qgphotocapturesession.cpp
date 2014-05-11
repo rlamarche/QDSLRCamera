@@ -4,11 +4,13 @@
 #include <QtCore/QDebug>
 #include <QFile>
 #include <QVideoSurfaceFormat>
+#include <QDir>
 
 #include "qgphotoviewfinderthread.h"
 
 QGPhotoCaptureSession::QGPhotoCaptureSession(QObject *parent) :
     QObject(parent),
+    m_viewFinderRunning(false),
     m_deviceChanged(false),
     m_videoSurface(0)
 {
@@ -195,49 +197,99 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
     CameraFile *gpFile;
     CameraFilePath gpCameraFilePath;
     int gpStatus;
+    CameraEventType gpEvtType;
+    void *gpEvtData;
 
-    if (!fileName.isEmpty()) {
-        gpStatus = gp_camera_capture(m_gpCamera, GP_CAPTURE_IMAGE, &gpCameraFilePath, m_gpContext);
-        if (gpStatus != GP_OK) {
-            gpError(gpStatus, QString("Unable to capture image"));
-            return;
-        }
+    bool viewFinderRunning = m_viewFinderRunning;
 
-        qDebug("Pathname on the camera: %s/%s\n", gpCameraFilePath.folder, gpCameraFilePath.name);
-
-        QFile output(fileName);
-        output.open(QIODevice::WriteOnly);
-
-        gpStatus = gp_file_new_from_fd(&gpFile, output.handle());
-        if (gpStatus != GP_OK) {
-            gpError(gpStatus, QString("Unable to create file from fd"));
-            return;
-        }
-
-        gpStatus = gp_camera_file_get(m_gpCamera, gpCameraFilePath.folder, gpCameraFilePath.name,
-                 GP_FILE_TYPE_NORMAL, gpFile, m_gpContext);
-        if (gpStatus != GP_OK) {
-            gp_file_free(gpFile);
-
-            gpError(gpStatus, QString("Unable to get file from camera"));
-            return;
-        }
-
-        qDebug() << "Delete file on camera";
-
-        gpStatus = gp_camera_file_delete(m_gpCamera, gpCameraFilePath.folder, gpCameraFilePath.name,
-                m_gpContext);
-        if (gpStatus != GP_OK) {
-            gp_file_free(gpFile);
-
-            gpError(gpStatus, QString("Unable to delete file"));
-            return;
-        }
-
-        output.close();
-
-        gp_file_free(gpFile);
+    if (m_viewFinderRunning) {
+        pauseViewFinder();
     }
+
+    QString path = fileName;
+    if (path.isEmpty()) {
+        int lastImage = 0;
+        QDir outputDir = QDir::currentPath();
+        foreach(QString fileName, outputDir.entryList(QStringList() << "img_*.jpg")) {
+            int imgNumber = fileName.mid(4, fileName.size()-8).toInt();
+            lastImage = qMax(lastImage, imgNumber);
+        }
+
+        path = QString("img_%1.jpg").arg(lastImage+1,
+                                         4, //fieldWidth
+                                         10,
+                                         QLatin1Char('0'));
+    }
+
+
+    gpStatus = gp_camera_capture(m_gpCamera, GP_CAPTURE_IMAGE, &gpCameraFilePath, m_gpContext);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to capture image"));
+        emit captureError(reqId, gpStatus, QString("Unable to capture image"));
+
+        return;
+    }
+    emit imageExposed(reqId);
+
+   // gp_camera_wait_for_event(m_gpCamera, -1, &gpEvtType, &gpEvtData, m_gpContext);
+/*
+    do {
+        gpStatus = gp_camera_wait_for_event(m_gpCamera, 5000, &gpEvtType, &gpEvtData, m_gpContext);
+    } while (gpStatus == GP_OK && (gpEvtType != GP_EVENT_CAPTURE_COMPLETE || gpEvtType != GP_EVENT_TIMEOUT));
+*/
+   /* if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to capture image"));
+        emit captureError(reqId, gpStatus, QString("Error waiting end capture image"));
+
+        return;
+    }*/
+
+    qDebug("Pathname on the camera: %s/%s\n", gpCameraFilePath.folder, gpCameraFilePath.name);
+
+    QFile output(path);
+    output.open(QIODevice::WriteOnly);
+
+    gpStatus = gp_file_new_from_fd(&gpFile, output.handle());
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to create file from fd"));
+        emit captureError(reqId, gpStatus, QString("Unable to create file from fd"));
+        return;
+    }
+
+    gpStatus = gp_camera_file_get(m_gpCamera, gpCameraFilePath.folder, gpCameraFilePath.name,
+             GP_FILE_TYPE_NORMAL, gpFile, m_gpContext);
+    if (gpStatus != GP_OK) {
+        gp_file_free(gpFile);
+
+        gpError(gpStatus, QString("Unable to get file from camera"));
+        emit captureError(reqId, gpStatus, QString("Unable to get file from camera"));
+
+        return;
+    }
+    emit imageSaved(reqId, path);
+
+    qDebug() << "Delete file on camera";
+
+    gpStatus = gp_camera_file_delete(m_gpCamera, gpCameraFilePath.folder, gpCameraFilePath.name,
+            m_gpContext);
+    if (gpStatus != GP_OK) {
+        gp_file_free(gpFile);
+
+        gpError(gpStatus, QString("Unable to delete file"));
+        emit captureError(reqId, gpStatus, QString("Unable to delete file"));
+        return;
+    }
+
+    output.close();
+
+    gp_file_free(gpFile);
+
+    gp_camera_wait_for_event(m_gpCamera, -1, &gpEvtType, &gpEvtData, m_gpContext);
+
+    if (viewFinderRunning) {
+        continueViewFinder();
+    }
+
 }
 
 int QGPhotoCaptureSession::deviceCount() const {
@@ -274,77 +326,112 @@ void QGPhotoCaptureSession::gpError(int gpStatus, QString message) {
     switch (gpStatus) {
         case GP_OK:
             errorMsg = QObject::tr("No error");
+            break;
         case GP_ERROR:
             errorMsg = QObject::tr("Unspecified error");
+            break;
         case GP_ERROR_IO:
             errorMsg = QObject::tr("I/O problem");
+            break;
         case GP_ERROR_BAD_PARAMETERS:
             errorMsg = QObject::tr("Bad parameters");
+            break;
         case GP_ERROR_NOT_SUPPORTED:
             errorMsg = QObject::tr("Unsupported operation");
+            break;
         case  GP_ERROR_FIXED_LIMIT_EXCEEDED:
             errorMsg = QObject::tr("Fixed limit exceeded");
+            break;
         case GP_ERROR_TIMEOUT:
             errorMsg = QObject::tr("Timeout reading from or writing to the port");
+            break;
         case GP_ERROR_IO_SUPPORTED_SERIAL:
             errorMsg = QObject::tr("Serial port not supported");
+            break;
         case GP_ERROR_IO_SUPPORTED_USB:
             errorMsg = QObject::tr("USB port not supported");
+            break;
         case GP_ERROR_UNKNOWN_PORT:
             errorMsg = QObject::tr("Unknown port");
+            break;
         case GP_ERROR_NO_MEMORY:
             errorMsg = QObject::tr("Out of memory");
+            break;
         case GP_ERROR_LIBRARY:
             errorMsg = QObject::tr("Error loading a library");
+            break;
         case GP_ERROR_IO_INIT:
             errorMsg = QObject::tr("Error initializing the port");
+            break;
         case GP_ERROR_IO_READ:
             errorMsg = QObject::tr("Error reading from the port");
+            break;
         case GP_ERROR_IO_WRITE:
             errorMsg = QObject::tr("Error writing to the port");
+            break;
         case GP_ERROR_IO_UPDATE:
             errorMsg = QObject::tr("Error updating the port settings");
+            break;
         case GP_ERROR_IO_SERIAL_SPEED:
             errorMsg = QObject::tr("Error setting the serial port speed");
+            break;
         case GP_ERROR_IO_USB_CLEAR_HALT:
             errorMsg = QObject::tr("Error clearing a halt condition on the USB port");
+            break;
         case GP_ERROR_IO_USB_FIND:
             errorMsg = QObject::tr("Could not find the requested device on the USB port");
+            break;
         case GP_ERROR_IO_USB_CLAIM:
             errorMsg = QObject::tr("Could not claim the USB device");
+            break;
         case GP_ERROR_IO_LOCK:
             errorMsg = QObject::tr("Could not lock the device");
+            break;
         case GP_ERROR_HAL:
             errorMsg = QObject::tr("libhal error");
+            break;
         case GP_ERROR_CORRUPTED_DATA:
             errorMsg = QObject::tr("Corrupted data received");
+            break;
         case GP_ERROR_FILE_EXISTS:
             errorMsg = QObject::tr("File already exists");
+            break;
         case GP_ERROR_MODEL_NOT_FOUND:
             errorMsg = QObject::tr("Specified camera model was not found");
+            break;
         case GP_ERROR_DIRECTORY_NOT_FOUND:
             errorMsg = QObject::tr("Specified directory was not found")        ;
+            break;
         case GP_ERROR_FILE_NOT_FOUND:
             errorMsg = QObject::tr("Specified directory was not found");
+            break;
         case GP_ERROR_DIRECTORY_EXISTS:
             errorMsg = QObject::tr("Specified directory already exists");
+            break;
         case GP_ERROR_CAMERA_BUSY:
             errorMsg = QObject::tr("The camera is already busy");
+            break;
         case GP_ERROR_PATH_NOT_ABSOLUTE:
             errorMsg = QObject::tr("Path is not absolute");
+            break;
         case GP_ERROR_CANCEL:
             errorMsg = QObject::tr("Cancellation successful");
+            break;
         case GP_ERROR_CAMERA_ERROR:
             errorMsg = QObject::tr("Unspecified camera error");
+            break;
         case GP_ERROR_OS_FAILURE:
             errorMsg = QObject::tr("Unspecified failure of the operating system");
+            break;
         case GP_ERROR_NO_SPACE:
             errorMsg = QObject::tr("Not enough space");
+            break;
         default:
             errorMsg = QObject::tr("Unknown error %1").arg(QString().sprintf("%d", gpStatus));
+            break;
     }
 
-    qWarning() << "GPhoto error : " << message << " : " << errorMsg;
+    qWarning("GPhoto error : %s : %s", message.toStdString().c_str(), errorMsg.toStdString().c_str());
 
     m_state = QGPhotoCaptureSession::ErrorState;
     emit stateChanged(m_state);
@@ -424,7 +511,24 @@ void QGPhotoCaptureSession::startViewFinder() {
 
         QVideoSurfaceFormat videoSurfaceFormat(frame.size(), frame.pixelFormat());
         m_videoSurface->start(videoSurfaceFormat);
+        m_viewFinderRunning = true;
     }
+}
+
+void QGPhotoCaptureSession::pauseViewFinder() {
+    m_viewFinderThread->stopNow();
+    if (m_gpContext && m_gpCamera && m_gpWindow) {
+        int value = 0;
+        setWidgetValue(QString("viewfinder"), &value);
+    }
+    m_viewFinderRunning = false;
+}
+
+void QGPhotoCaptureSession::continueViewFinder() {
+    int value = 1;
+    setWidgetValue(QString("viewfinder"), &value);
+    m_viewFinderThread->start();
+    m_viewFinderRunning = true;
 }
 
 void QGPhotoCaptureSession::stopViewFinder() {
@@ -437,6 +541,7 @@ void QGPhotoCaptureSession::stopViewFinder() {
         int value = 0;
         setWidgetValue(QString("viewfinder"), &value);
     }
+    m_viewFinderRunning = false;
 }
 
 void QGPhotoCaptureSession::setWidgetValue(QString name, const void *value) {

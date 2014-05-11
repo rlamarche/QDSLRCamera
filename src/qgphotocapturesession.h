@@ -37,6 +37,8 @@ public:
 
     void startViewFinder();
     void stopViewFinder();
+    void pauseViewFinder();
+    void continueViewFinder();
 
     void captureImage(int reqId, const QString &fileName);
     QImage capturePreview();
@@ -54,6 +56,7 @@ private:
     GPContext *m_gpContext;
     Camera *m_gpCamera;
     CameraWidget *m_gpWindow;
+    bool m_viewFinderRunning;
 
     mutable QList<QByteArray> m_cameraDevices;
     mutable QStringList m_cameraDescriptions;
@@ -71,6 +74,15 @@ private:
 signals:
     void stateChanged(QGPhotoCaptureSession::State state);
     void error(int error, const QString &errorString);
+
+    void imageExposed(int id);
+    void imageCaptured(int id, const QImage &preview);
+    void imageMetadataAvailable(int id, const QString &key, const QVariant &value);
+    void imageAvailable(int id, const QVideoFrame &buffer);
+    void imageSaved(int id, const QString &fileName);
+
+    void captureError(int id, int error, const QString &errorString);
+
 
 public slots:
     void videoSurfaceActive(bool active);
