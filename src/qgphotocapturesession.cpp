@@ -3,20 +3,32 @@
 #include <gphoto2/gphoto2-port-info-list.h>
 #include <QtCore/QDebug>
 #include <QFile>
+#include <QVideoSurfaceFormat>
+
+#include "qgphotoviewfinderthread.h"
 
 QGPhotoCaptureSession::QGPhotoCaptureSession(QObject *parent) :
-    QObject(parent)
+    QObject(parent),
+    m_deviceChanged(false),
+    m_videoSurface(0)
 {
     m_gpContext = gp_context_new();
     m_gpCamera = 0;
+    m_gpWindow = 0;
     updateDevices();
 
     m_selectedDevice = -1;
     m_state = QGPhotoCaptureSession::StoppedState;
+
+    m_viewFinderThread = new QGPhotoViewFinderThread(this);
+    connect(m_viewFinderThread, SIGNAL(previewAvailable(QImage)), this, SLOT(previewAvailable(QImage)));
 }
 
 QGPhotoCaptureSession::~QGPhotoCaptureSession()
 {
+    if (m_viewFinderThread->isRunning()) {
+        m_viewFinderThread->stopNow();
+    }
     gp_context_unref(m_gpContext);
 }
 
@@ -46,121 +58,137 @@ void QGPhotoCaptureSession::updateDevices() const
 }
 
 void QGPhotoCaptureSession::openDevice() {
-    int gpStatus;
-    // the port handle
-    int portHandle;
+    if (!m_gpCamera || m_deviceChanged) {
+        if (m_gpCamera) {
+            closeDevice();
+        }
 
-    // model index
-    int gpModelIndex;
-    GPPortInfoList *gpPortInfoList;
-    GPPortInfo gpPortInfo;
-    CameraAbilitiesList *gpCameraAbilitiesList;
-    CameraAbilities gpCameraAbilities;
+        int gpStatus;
+        // the port handle
+        int portHandle;
 
-    CameraEventType gpEvtType;
-    void *gpEvtData;
+        // model index
+        int gpModelIndex;
+        GPPortInfoList *gpPortInfoList;
+        GPPortInfo gpPortInfo;
+        CameraAbilitiesList *gpCameraAbilitiesList;
+        CameraAbilities gpCameraAbilities;
+    /*
+        CameraEventType gpEvtType;
+        void *gpEvtData;
+    */
+        // Create a camera object
+        gpStatus = gp_camera_new(&m_gpCamera);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to create camera object"));
+            return;
+        }
 
-    // Create a camera object
-    gpStatus = gp_camera_new(&m_gpCamera);
-    if (gpStatus != GP_OK) {
-        gpError(gpStatus);
-        return;
-    }
+        // Lookup camera model
+        gpStatus = gp_abilities_list_new(&gpCameraAbilitiesList);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to create abilities list"));
+            return;
+        }
 
-    // Lookup camera model
-    gpStatus = gp_abilities_list_new(&gpCameraAbilitiesList);
-    if (gpStatus != GP_OK) {
-        gpError(gpStatus);
-        return;
-    }
+        gpStatus = gp_abilities_list_load(gpCameraAbilitiesList, m_gpContext);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to load abilities list"));
+            return;
+        }
 
-    gpStatus = gp_abilities_list_load(gpCameraAbilitiesList, m_gpContext);
-    if (gpStatus != GP_OK) {
-        gpError(gpStatus);
-        return;
-    }
+        gpModelIndex = gp_abilities_list_lookup_model(gpCameraAbilitiesList, m_cameraDescriptions[m_selectedDevice].toStdString().c_str());
+        if (gpModelIndex < 0) {
+            gpError(gpStatus, QString("Unable to lookup model"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            return;
+        }
 
-    gpModelIndex = gp_abilities_list_lookup_model(gpCameraAbilitiesList, m_cameraDescriptions[m_selectedDevice].toStdString().c_str());
-    if (gpModelIndex < 0) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
+        gpStatus = gp_abilities_list_get_abilities(gpCameraAbilitiesList, gpModelIndex, &gpCameraAbilities);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to get camera model abilities"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            return;
+        }
 
-        gpError(gpStatus);
-        return;
-    }
+        gpStatus = gp_camera_set_abilities (m_gpCamera, gpCameraAbilities);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to set abilities"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            return;
+        }
 
-    gpStatus = gp_abilities_list_get_abilities(gpCameraAbilitiesList, gpModelIndex, &gpCameraAbilities);
-    if (gpStatus != GP_OK) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
+        // Get usb port
+        gpStatus = gp_port_info_list_new(&gpPortInfoList);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to get usb port"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            return;
+        }
 
-        gpError(gpStatus);
-        return;
-    }
+        gpStatus = gp_port_info_list_load(gpPortInfoList);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to load port info list"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            gp_port_info_list_free(gpPortInfoList);
+            return;
+        }
 
-    gpStatus = gp_camera_set_abilities (m_gpCamera, gpCameraAbilities);
-    if (gpStatus != GP_OK) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
+        portHandle = gp_port_info_list_lookup_path (gpPortInfoList, QString(m_cameraDevices[m_selectedDevice]).toStdString().c_str());
+        if (portHandle < 0) {
+            gpError(gpStatus, QString("Unable to lookup port path"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            gp_port_info_list_free(gpPortInfoList);
+            return;
+        }
 
-        gpError(gpStatus);
-        return;
-    }
+        gpStatus = gp_port_info_list_get_info (gpPortInfoList, portHandle, &gpPortInfo);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to get port info list"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            gp_port_info_list_free(gpPortInfoList);
+            return;
+        }
 
-    // Get usb port
-    gpStatus = gp_port_info_list_new(&gpPortInfoList);
-    if (gpStatus != GP_OK) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
+        gpStatus = gp_camera_set_port_info (m_gpCamera, gpPortInfo);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to set port info"));
+            gp_abilities_list_free(gpCameraAbilitiesList);
+            gp_port_info_list_free(gpPortInfoList);
+            return;
+        }
 
-        return;
-    }
+        // Useless function ?
+        gp_camera_init(m_gpCamera, m_gpContext);
 
-    gpStatus = gp_port_info_list_load(gpPortInfoList);
-    if (gpStatus != GP_OK) {
         gp_abilities_list_free(gpCameraAbilitiesList);
         gp_port_info_list_free(gpPortInfoList);
 
-        gpError(gpStatus);
-        return;
+        gpStatus = gp_camera_get_config(m_gpCamera, &m_gpWindow, m_gpContext);
+        if (gpStatus != GP_OK) {
+            gpError(gpStatus, QString("Unable to get camera config"));
+            return;
+        }
     }
-
-    portHandle = gp_port_info_list_lookup_path (gpPortInfoList, QString(m_cameraDevices[m_selectedDevice]).toStdString().c_str());
-    if (portHandle < 0) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
-        gp_port_info_list_free(gpPortInfoList);
-
-        gpError(gpStatus);
-        return;
-    }
-
-    gpStatus = gp_port_info_list_get_info (gpPortInfoList, portHandle, &gpPortInfo);
-    if (gpStatus != GP_OK) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
-        gp_port_info_list_free(gpPortInfoList);
-
-        gpError(gpStatus);
-        return;
-    }
-
-    gpStatus = gp_camera_set_port_info (m_gpCamera, gpPortInfo);
-    if (gpStatus != GP_OK) {
-        gp_abilities_list_free(gpCameraAbilitiesList);
-        gp_port_info_list_free(gpPortInfoList);
-
-        gpError(gpStatus);
-        return;
-    }
-
-    gp_camera_init(m_gpCamera, m_gpContext);
-
-    gp_abilities_list_free(gpCameraAbilitiesList);
-    gp_port_info_list_free(gpPortInfoList);
-/*
-    do {
-        ret = gp_camera_wait_for_event (gp_camera, 10, &gp_evttype, &gp_evtdata, gp_context);
-    } while ((ret == GP_OK) && (gp_evttype != GP_EVENT_TIMEOUT));
-
-    emit cameraOpened();*/
-
     m_state = QGPhotoCaptureSession::ReadyState;
     emit stateChanged(m_state);
+    m_deviceChanged = false;
+}
+
+void QGPhotoCaptureSession::closeDevice() {
+    qDebug("QGPhotoCaptureSession::closeDevice");
+    stopViewFinder();
+
+    if (m_gpWindow) {
+        gp_widget_free(m_gpWindow);
+        m_gpWindow = 0;
+    }
+    if (m_gpCamera) {
+        gp_camera_exit(m_gpCamera, m_gpContext);
+        gp_camera_unref(m_gpCamera);
+        m_gpCamera = 0;
+    }
+    m_state = StoppedState;
 }
 
 void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
@@ -171,7 +199,7 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
     if (!fileName.isEmpty()) {
         gpStatus = gp_camera_capture(m_gpCamera, GP_CAPTURE_IMAGE, &gpCameraFilePath, m_gpContext);
         if (gpStatus != GP_OK) {
-            gpError(gpStatus);
+            gpError(gpStatus, QString("Unable to capture image"));
             return;
         }
 
@@ -182,7 +210,7 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
 
         gpStatus = gp_file_new_from_fd(&gpFile, output.handle());
         if (gpStatus != GP_OK) {
-            gpError(gpStatus);
+            gpError(gpStatus, QString("Unable to create file from fd"));
             return;
         }
 
@@ -191,7 +219,7 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
         if (gpStatus != GP_OK) {
             gp_file_free(gpFile);
 
-            gpError(gpStatus);
+            gpError(gpStatus, QString("Unable to get file from camera"));
             return;
         }
 
@@ -202,7 +230,7 @@ void QGPhotoCaptureSession::captureImage(int reqId, const QString &fileName) {
         if (gpStatus != GP_OK) {
             gp_file_free(gpFile);
 
-            gpError(gpStatus);
+            gpError(gpStatus, QString("Unable to delete file"));
             return;
         }
 
@@ -233,10 +261,14 @@ int QGPhotoCaptureSession::selectedDevice() const {
 }
 
 void QGPhotoCaptureSession::setSelectedDevice(int index) {
+    if (m_state == ReadyState && index != m_selectedDevice) {
+        qDebug("Selected device has changed !");
+        m_deviceChanged = true;
+    }
     m_selectedDevice = index;
 }
 
-void QGPhotoCaptureSession::gpError(int gpStatus) {
+void QGPhotoCaptureSession::gpError(int gpStatus, QString message) {
     QString errorMsg;
 
     switch (gpStatus) {
@@ -312,7 +344,7 @@ void QGPhotoCaptureSession::gpError(int gpStatus) {
             errorMsg = QObject::tr("Unknown error %1").arg(QString().sprintf("%d", gpStatus));
     }
 
-    qWarning() << "GPhoto2 error : " << errorMsg;
+    qWarning() << "GPhoto error : " << message << " : " << errorMsg;
 
     m_state = QGPhotoCaptureSession::ErrorState;
     emit stateChanged(m_state);
@@ -321,4 +353,111 @@ void QGPhotoCaptureSession::gpError(int gpStatus) {
 
 QGPhotoCaptureSession::State QGPhotoCaptureSession::state() {
     return m_state;
+}
+
+void QGPhotoCaptureSession::setSurface(QAbstractVideoSurface *surface) {
+    qDebug("QGPhotoCaptureSession::setSurface");
+    if (m_videoSurface && m_videoSurface != surface) {
+        disconnect(m_videoSurface, SIGNAL(activeChanged(bool)), this, SLOT(videoSurfaceActive(bool)));
+    }
+    m_videoSurface = surface;
+
+    connect(m_videoSurface, SIGNAL(activeChanged(bool)), this, SLOT(videoSurfaceActive(bool)));
+}
+
+QImage QGPhotoCaptureSession::capturePreview() {
+    int gpStatus;
+    CameraFile *gpFile;
+    unsigned long int size;
+    const char *data;
+    QImage image;
+
+    //CameraEventType evttype;;
+    //void *evtdata;
+
+    gpStatus = gp_file_new(&gpFile);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to create file for capture"));
+        return image;
+    }
+
+    gpStatus = gp_camera_capture_preview(m_gpCamera, gpFile, m_gpContext);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to capture preview"));
+        gp_file_free(gpFile);
+        return image;
+    }
+
+    gpStatus = gp_file_get_data_and_size(gpFile, &data, &size);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get file data and size"));
+        gp_file_free(gpFile);
+        return image;
+    }
+
+    image.loadFromData((uchar*) data, size, "JPG");
+
+    gp_file_free(gpFile);
+    return image;
+}
+
+void QGPhotoCaptureSession::videoSurfaceActive(bool active) {
+    if (active && m_videoSurface) {
+        qDebug("Surface active");
+        m_viewFinderThread->start();
+    }
+}
+
+void QGPhotoCaptureSession::previewAvailable(const QImage &preview) {
+    if (m_videoSurface->isActive()) {
+        QVideoFrame frame(preview);
+        m_videoSurface->present(frame);
+    }
+}
+
+void QGPhotoCaptureSession::startViewFinder() {
+    if (m_videoSurface) {
+        int value = 1;
+        setWidgetValue(QString("viewfinder"), &value);
+        QImage preview = capturePreview();
+        QVideoFrame frame(preview);
+
+        QVideoSurfaceFormat videoSurfaceFormat(frame.size(), frame.pixelFormat());
+        m_videoSurface->start(videoSurfaceFormat);
+    }
+}
+
+void QGPhotoCaptureSession::stopViewFinder() {
+    if (m_videoSurface) {
+        m_videoSurface->stop();
+    }
+
+    m_viewFinderThread->stopNow();
+    if (m_gpContext && m_gpCamera && m_gpWindow) {
+        int value = 0;
+        setWidgetValue(QString("viewfinder"), &value);
+    }
+}
+
+void QGPhotoCaptureSession::setWidgetValue(QString name, const void *value) {
+    CameraWidget *gpWidget;
+    int gpStatus;
+
+    gpStatus = gp_widget_get_child_by_name(m_gpWindow, name.toStdString().c_str(), &gpWidget);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to get child widget by name"));
+        return;
+    }
+
+    gpStatus = gp_widget_set_value(gpWidget, value);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to set widget value"));
+        return;
+    }
+
+    gpStatus = gp_camera_set_config(m_gpCamera, m_gpWindow, m_gpContext);
+    if (gpStatus != GP_OK) {
+        gpError(gpStatus, QString("Unable to set config"));
+        return;
+    }
 }

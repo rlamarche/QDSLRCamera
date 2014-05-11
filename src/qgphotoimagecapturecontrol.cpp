@@ -32,7 +32,7 @@ void QGPhotoImageCaptureControl::setDriveMode(QCameraImageCapture::DriveMode mod
 }
 
 int QGPhotoImageCaptureControl::capture(const QString &fileName) {
-    qDebug() << "QGPhotoImageCaptureControl::capture " << filename;
+    qDebug() << "QGPhotoImageCaptureControl::capture " << fileName;
 
     m_lastId ++;
     m_captureSession->captureImage(m_lastId, fileName);

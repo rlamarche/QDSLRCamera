@@ -19,6 +19,7 @@ QGPhotoCaptureService::QGPhotoCaptureService(const QString &service, QObject *pa
         m_cameraControl = new QGPhotoCameraControl(m_captureSession);
         m_imageCaptureControl = new QGPhotoImageCaptureControl(m_captureSession);
         m_videoInputDevice = new QGPhotoVideoInputDeviceControl(m_captureSession);
+        m_videoRenderer = new QGPhotoVideoRendererControl(m_captureSession);
     }
 
 }
@@ -42,6 +43,10 @@ QMediaControl *QGPhotoCaptureService::requestControl(const char *name)
     if (qstrcmp(name, QVideoDeviceSelectorControl_iid) == 0)
         return m_videoInputDevice;
 
+    if (qstrcmp(name, QVideoRendererControl_iid) == 0)
+        return m_videoRenderer;
+
+
 
     return 0;
 }
@@ -61,5 +66,18 @@ Request control : org.qt-project.qt.cameraimageprocessingcontrol/5.0
 
 void QGPhotoCaptureService::releaseControl(QMediaControl *control)
 {
+    m_captureSession->stopViewFinder();
+    qDebug("Release control");
 
+    if (control && control == m_cameraControl) {
+        qDebug("Release m_cameraControl");
+    }
+    if (control && control == m_imageCaptureControl) {
+        qDebug("Release m_imageCaptureControl");
+    }
+    if (control && control == m_videoInputDevice) {
+        qDebug("Release m_videoInputDevice");
+        m_captureSession->stopViewFinder();
+        m_captureSession->closeDevice();
+    }
 }

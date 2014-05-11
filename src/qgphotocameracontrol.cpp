@@ -50,7 +50,7 @@ QCamera::State QGPhotoCameraControl::state() const {
     // TODO
     qDebug() << "QGPhotoCameraControl::state";
 
-    return QCamera::LoadedState;
+    return m_state;
 }
 
 void QGPhotoCameraControl::setState(QCamera::State state) {
@@ -63,10 +63,11 @@ void QGPhotoCameraControl::setState(QCamera::State state) {
     switch (state) {
     case QCamera::UnloadedState:
     case QCamera::LoadedState:
-        // TODO m_session->setState(QGstreamerCaptureSession::StoppedState);
+        m_captureSession->closeDevice();
         break;
     case QCamera::ActiveState:
         m_captureSession->openDevice();
+        m_captureSession->startViewFinder();
         break;
     default:
         emit error(QCamera::NotSupportedFeatureError, tr("State not supported."));
